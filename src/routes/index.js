@@ -1,5 +1,6 @@
 const adminRoutes = require('./admin');
 const userRoutes = require('./user');
+const pagesRoutes = require('./pages');
 
 const setupRoutes = (app, config) => {
   // API маршруты
@@ -13,7 +14,6 @@ const setupRoutes = (app, config) => {
   });
 
   // Публичные страницы (должна быть последней)
-  const pagesRoutes = require('./pages');
   app.use(pagesRoutes);
 };
 
