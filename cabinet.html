@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Кабинет — Бедрок-клад</title>
+<link rel="stylesheet" href="/style.css">
+<style>
+  header.top {
+    border-bottom: 1px solid var(--stone-700);
+    padding: 20px 0;
+    position: sticky;
+    top: 0;
+    background: rgba(22, 20, 15, 0.92);
+    backdrop-filter: blur(8px);
+    z-index: 50;
+  }
+  .top-inner { display: flex; align-items: center; justify-content: space-between; }
+  .brand { display: flex; align-items: center; gap: 10px; font-family: var(--font-display); font-size: 22px; }
+  .brand svg { width: 26px; height: 26px; }
+  .nav-right { display: flex; align-items: center; gap: 18px; font-size: 14px; }
+  .nick-badge { font-family: var(--font-mono); color: var(--gold-bright); }
+
+  .page-head { padding: 44px 0 24px; }
+  .page-head h1 { font-size: 36px; }
+
+  .orders-list { display: flex; flex-direction: column; gap: 16px; padding-bottom: 80px; }
+  .order-card { display: flex; flex-direction: column; gap: 12px; }
+  .order-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+  .order-title { font-family: var(--font-display); font-size: 20px; }
+  .order-sub { color: var(--parchment-dim); font-size: 13px; font-family: var(--font-mono); }
+
+  .status-pill {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 5px 12px;
+    border-radius: 20px;
+    white-space: nowrap;
+    border: 1px solid;
+  }
+  .status-pending { color: var(--gold-bright); border-color: var(--gold); background: rgba(201,162,75,0.08); }
+  .status-confirmed { color: #7fb2e8; border-color: #5f8cba; background: rgba(95,140,186,0.08); }
+  .status-completed { color: var(--ok); border-color: var(--ok); background: rgba(107,138,79,0.08); }
+  .status-cancelled { color: var(--danger); border-color: var(--danger); background: rgba(168,64,47,0.08); }
+
+  .coords-box {
+    background: var(--stone-950);
+    border: 1px dashed var(--gold);
+    border-radius: 4px;
+    padding: 16px 18px;
+    font-family: var(--font-mono);
+    font-size: 15px;
+    color: var(--gold-bright);
+    letter-spacing: 0.03em;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .coords-waiting {
+    color: var(--parchment-dim);
+    font-size: 13px;
+    font-style: italic;
+  }
+  .copy-btn {
+    background: none;
+    border: 1px solid var(--stone-600);
+    color: var(--parchment-dim);
+    font-size: 11px;
+    padding: 6px 10px;
+    border-radius: 3px;
+    cursor: pointer;
+    font-family: var(--font-mono);
+    flex-shrink: 0;
+  }
+  .copy-btn:hover { border-color: var(--gold); color: var(--gold-bright); }
+
+  .empty-state { text-align: center; padding: 80px 20px; color: var(--parchment-dim); }
+  .empty-state svg { width: 48px; height: 48px; opacity: 0.4; margin-bottom: 16px; }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="container top-inner">
+    <div class="brand">
+      <svg viewBox="0 0 24 24" fill="none" stroke="var(--gold)" stroke-width="1.3"><path d="M12 2l2.4 6.6L21 11l-6.6 2.4L12 20l-2.4-6.6L3 11l6.6-2.4L12 2z"/></svg>
+      Бедрок-клад
+    </div>
+    <div class="nav-right">
+      <span class="nick-badge" id="nickBadge"></span>
+      <a href="/shop" class="btn btn-ghost btn-sm">Лавка</a>
+      <button class="btn btn-ghost btn-sm" id="logoutBtn">Выйти</button>
+    </div>
+  </div>
+</header>
+
+<div class="container">
+  <div class="page-head">
+    <span class="eyebrow">твои заявки</span>
+    <h1>Кабинет</h1>
+  </div>
+
+  <div class="orders-list" id="ordersList">
+    <div class="card order-card">
+      <div class="skeleton" style="height:20px;width:40%"></div>
+      <div class="skeleton" style="height:40px"></div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const toast = document.getElementById('toast');
+function showToast(msg, isError) {
+  toast.textContent = msg;
+  toast.className = 'toast show' + (isError ? ' error' : '');
+  setTimeout(() => toast.classList.remove('show'), 3200);
+}
+
+const statusLabels = {
+  pending: 'Ожидает подтверждения',
+  confirmed: 'Подтверждено',
+  completed: 'Выдано',
+  cancelled: 'Отменено'
+};
+
+async function init() {
+  const me = await fetch('/api/user/me').then(r => r.json());
+  if (!me.loggedIn) { window.location.href = '/'; return; }
+  document.getElementById('nickBadge').textContent = me.nickname;
+  loadOrders();
+}
+
+async function loadOrders() {
+  const list = document.getElementById('ordersList');
+  try {
+    const res = await fetch('/api/user/orders/mine');
+    if (res.status === 401) { window.location.href = '/'; return; }
+    const orders = await res.json();
+
+    if (orders.length === 0) {
+      list.innerHTML = `
+        <div class="empty-state">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M12 2l2.4 6.6L21 11l-6.6 2.4L12 20l-2.4-6.6L3 11l6.6-2.4L12 2z"/></svg>
+          <div>Заявок пока нет.</div>
+          <a href="/shop" class="btn btn-ghost btn-sm" style="margin-top:16px;">В лавку</a>
+        </div>`;
+      return;
+    }
+
+    list.innerHTML = orders.map(renderOrder).join('');
+
+    list.querySelectorAll('.copy-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        navigator.clipboard.writeText(btn.dataset.coords).then(() => {
+          showToast('Координаты скопированы');
+        });
+      });
+    });
+  } catch (e) {
+    list.innerHTML = `<div class="empty-state">Не удалось загрузить заявки. Обнови страницу.</div>`;
+  }
+}
+
+function renderOrder(o) {
+  const date = new Date(o.createdAt).toLocaleString('ru-RU', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+
+  let coordsBlock;
+  if (o.coords) {
+    coordsBlock = `
+      <div class="coords-box">
+        <span>${escapeHtml(o.coords)}</span>
+        <button class="copy-btn" data-coords="${escapeHtml(o.coords)}">Копировать</button>
+      </div>`;
+  } else if (o.status === 'cancelled') {
+    coordsBlock = `<div class="coords-waiting">Заявка отменена.</div>`;
+  } else {
+    coordsBlock = `<div class="coords-waiting">Координаты появятся здесь после подтверждения заявки.</div>`;
+  }
+
+  const note = o.adminNote ? `<div class="order-sub" style="color:var(--parchment-dim); font-style:italic;">${escapeHtml(o.adminNote)}</div>` : '';
+
+  return `
+    <div class="card order-card">
+      <div class="order-top">
+        <div>
+          <div class="order-title">${escapeHtml(o.lotTitle)}</div>
+          <div class="order-sub">${o.quantity} шт · ${o.price * o.quantity} ₽ · ${date}</div>
+        </div>
+        <span class="status-pill status-${o.status}">${statusLabels[o.status] || o.status}</span>
+      </div>
+      ${coordsBlock}
+      ${note}
+    </div>`;
+}
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+document.getElementById('logoutBtn').addEventListener('click', async () => {
+  await fetch('/api/user/logout', { method: 'POST' });
+  window.location.href = '/';
+});
+
+init();
+</script>
+</body>
+</html>

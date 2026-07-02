@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Лавка — Бедрок-клад</title>
+<link rel="stylesheet" href="/style.css">
+<style>
+  header.top {
+    border-bottom: 1px solid var(--stone-700);
+    padding: 20px 0;
+    position: sticky;
+    top: 0;
+    background: rgba(22, 20, 15, 0.92);
+    backdrop-filter: blur(8px);
+    z-index: 50;
+  }
+  .top-inner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-family: var(--font-display);
+    font-size: 22px;
+    letter-spacing: 0.03em;
+  }
+  .brand svg { width: 26px; height: 26px; }
+  .nav-right {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    font-size: 14px;
+  }
+  .nick-badge {
+    font-family: var(--font-mono);
+    color: var(--gold-bright);
+  }
+
+  .hero {
+    padding: 56px 0 36px;
+    text-align: center;
+  }
+  .hero h1 { font-size: 44px; margin-bottom: 10px; }
+  .hero p { color: var(--parchment-dim); max-width: 520px; margin: 0 auto; }
+
+  .lots-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(270px, 1fr));
+    gap: 22px;
+    padding: 20px 0 80px;
+  }
+  .lot-card {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    padding: 0;
+    transition: transform 0.2s ease, border-color 0.2s ease;
+  }
+  .lot-card:hover {
+    transform: translateY(-3px);
+    border-color: var(--gold);
+  }
+  .lot-photo {
+    width: 100%;
+    aspect-ratio: 4/3;
+    object-fit: cover;
+    background: var(--stone-800);
+    display: block;
+  }
+  .lot-photo.placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--stone-600);
+    font-family: var(--font-mono);
+    font-size: 12px;
+  }
+  .lot-body { padding: 20px; display: flex; flex-direction: column; gap: 10px; flex: 1; }
+  .lot-title { font-family: var(--font-display); font-size: 22px; }
+  .lot-desc { color: var(--parchment-dim); font-size: 14px; flex: 1; }
+  .lot-meta {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-top: 4px;
+  }
+  .lot-price {
+    font-family: var(--font-mono);
+    font-size: 20px;
+    color: var(--gold-bright);
+    font-weight: 600;
+  }
+  .lot-qty {
+    font-size: 12px;
+    color: var(--parchment-dim);
+    font-family: var(--font-mono);
+  }
+  .lot-qty.low { color: var(--ember-bright); }
+  .lot-qty.out { color: var(--danger); }
+
+  .empty-state {
+    text-align: center;
+    padding: 80px 20px;
+    color: var(--parchment-dim);
+  }
+  .empty-state svg { width: 48px; height: 48px; opacity: 0.4; margin-bottom: 16px; }
+
+  .modal-overlay {
+    position: fixed; inset: 0;
+    background: rgba(15, 13, 10, 0.75);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 200;
+    padding: 20px;
+  }
+  .modal-overlay.show { display: flex; }
+  .modal {
+    max-width: 420px;
+    width: 100%;
+  }
+  .modal h3 { font-size: 24px; margin-bottom: 6px; }
+  .modal .lot-price { display: block; margin-bottom: 18px; }
+  .modal-actions { display: flex; gap: 10px; margin-top: 20px; }
+  .modal-actions .btn { flex: 1; }
+
+  .skeleton {
+    background: linear-gradient(90deg, var(--stone-800) 25%, var(--stone-700) 37%, var(--stone-800) 63%);
+    background-size: 400% 100%;
+    animation: shimmer 1.4s ease infinite;
+    border-radius: 4px;
+  }
+  @keyframes shimmer {
+    0% { background-position: 100% 50%; }
+    100% { background-position: 0 50%; }
+  }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="container top-inner">
+    <div class="brand">
+      <svg viewBox="0 0 24 24" fill="none" stroke="var(--gold)" stroke-width="1.3">
+        <path d="M12 2l2.4 6.6L21 11l-6.6 2.4L12 20l-2.4-6.6L3 11l6.6-2.4L12 2z"/>
+      </svg>
+      Бедрок-клад
+    </div>
+    <div class="nav-right">
+      <span class="nick-badge" id="nickBadge"></span>
+      <a href="/cabinet" class="btn btn-ghost btn-sm">Кабинет</a>
+      <button class="btn btn-ghost btn-sm" id="logoutBtn">Выйти</button>
+    </div>
+  </div>
+</header>
+
+<section class="hero container">
+  <span class="eyebrow">актуальные лоты</span>
+  <h1>Лавка кладов</h1>
+  <p>Выбирай лот, оформляй заявку — координаты клада появятся в твоём кабинете, как только я подтвержу заказ.</p>
+</section>
+
+<div class="container">
+  <div class="lots-grid" id="lotsGrid">
+    <div class="card lot-card"><div class="skeleton" style="aspect-ratio:4/3"></div><div class="lot-body"><div class="skeleton" style="height:20px;width:70%"></div><div class="skeleton" style="height:14px;margin-top:8px"></div></div></div>
+    <div class="card lot-card"><div class="skeleton" style="aspect-ratio:4/3"></div><div class="lot-body"><div class="skeleton" style="height:20px;width:70%"></div><div class="skeleton" style="height:14px;margin-top:8px"></div></div></div>
+    <div class="card lot-card"><div class="skeleton" style="aspect-ratio:4/3"></div><div class="lot-body"><div class="skeleton" style="height:20px;width:70%"></div><div class="skeleton" style="height:14px;margin-top:8px"></div></div></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modalOverlay">
+  <div class="card modal">
+    <h3 id="modalTitle"></h3>
+    <span class="lot-price" id="modalPrice"></span>
+    <div class="field">
+      <label for="modalQty">Количество</label>
+      <input type="number" id="modalQty" min="1" value="1">
+    </div>
+    <p class="muted" id="modalMax" style="font-size:13px;"></p>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="modalCancel">Отмена</button>
+      <button class="btn btn-primary" id="modalConfirm">Оформить заявку</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const toast = document.getElementById('toast');
+function showToast(msg, isError) {
+  toast.textContent = msg;
+  toast.className = 'toast show' + (isError ? ' error' : '');
+  setTimeout(() => toast.classList.remove('show'), 3200);
+}
+
+let currentLot = null;
+
+async function init() {
+  const me = await fetch('/api/user/me').then(r => r.json());
+  if (!me.loggedIn) {
+    window.location.href = '/';
+    return;
+  }
+  document.getElementById('nickBadge').textContent = me.nickname;
+  loadLots();
+}
+
+async function loadLots() {
+  const grid = document.getElementById('lotsGrid');
+  try {
+    const res = await fetch('/api/user/lots');
+    if (res.status === 401) { window.location.href = '/'; return; }
+    const lots = await res.json();
+
+    if (lots.length === 0) {
+      grid.innerHTML = `
+        <div class="empty-state" style="grid-column: 1/-1;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M12 2l2.4 6.6L21 11l-6.6 2.4L12 20l-2.4-6.6L3 11l6.6-2.4L12 2z"/></svg>
+          <div>Лотов пока нет. Загляни позже.</div>
+        </div>`;
+      return;
+    }
+
+    grid.innerHTML = lots.map(lot => renderLotCard(lot)).join('');
+
+    grid.querySelectorAll('.lot-card').forEach(card => {
+      card.addEventListener('click', () => openModal(lots.find(l => l.id === card.dataset.id)));
+    });
+  } catch (e) {
+    grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1;">Не удалось загрузить лоты. Обнови страницу.</div>`;
+  }
+}
+
+function renderLotCard(lot) {
+  const photo = lot.photo
+    ? `<img class="lot-photo" src="${lot.photo}" alt="${escapeHtml(lot.title)}">`
+    : `<div class="lot-photo placeholder">без фото</div>`;
+
+  let qtyClass = '';
+  let qtyText = `в наличии: ${lot.quantity}`;
+  if (lot.quantity === 0) { qtyClass = 'out'; qtyText = 'нет в наличии'; }
+  else if (lot.quantity <= 2) { qtyClass = 'low'; }
+
+  return `
+    <div class="card lot-card" data-id="${lot.id}" style="cursor:${lot.quantity > 0 ? 'pointer' : 'default'}; ${lot.quantity === 0 ? 'opacity:0.55' : ''}">
+      ${photo}
+      <div class="lot-body">
+        <div class="lot-title">${escapeHtml(lot.title)}</div>
+        <div class="lot-desc">${escapeHtml(lot.description || '')}</div>
+        <div class="lot-meta">
+          <span class="lot-price">${lot.price} ₽</span>
+          <span class="lot-qty ${qtyClass}">${qtyText}</span>
+        </div>
+      </div>
+    </div>`;
+}
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+function openModal(lot) {
+  if (!lot || lot.quantity === 0) return;
+  currentLot = lot;
+  document.getElementById('modalTitle').textContent = lot.title;
+  document.getElementById('modalPrice').textContent = lot.price + ' ₽ / шт';
+  const qtyInput = document.getElementById('modalQty');
+  qtyInput.value = 1;
+  qtyInput.max = lot.quantity;
+  document.getElementById('modalMax').textContent = `Доступно: ${lot.quantity} шт`;
+  document.getElementById('modalOverlay').classList.add('show');
+}
+
+function closeModal() {
+  document.getElementById('modalOverlay').classList.remove('show');
+  currentLot = null;
+}
+
+document.getElementById('modalCancel').addEventListener('click', closeModal);
+document.getElementById('modalOverlay').addEventListener('click', (e) => {
+  if (e.target.id === 'modalOverlay') closeModal();
+});
+
+document.getElementById('modalConfirm').addEventListener('click', async () => {
+  if (!currentLot) return;
+  const qty = parseInt(document.getElementById('modalQty').value, 10) || 1;
+  const btn = document.getElementById('modalConfirm');
+  btn.disabled = true;
+  btn.textContent = 'Оформляем...';
+
+  try {
+    const res = await fetch('/api/user/orders', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ lotId: currentLot.id, quantity: qty })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Ошибка оформления');
+    closeModal();
+    showToast('Заявка оформлена! Проверяй кабинет.');
+    loadLots();
+  } catch (err) {
+    showToast(err.message, true);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Оформить заявку';
+  }
+});
+
+document.getElementById('logoutBtn').addEventListener('click', async () => {
+  await fetch('/api/user/logout', { method: 'POST' });
+  window.location.href = '/';
+});
+
+init();
+</script>
+</body>
+</html>
